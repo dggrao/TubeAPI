@@ -27,9 +27,10 @@ BASE_YDL_OPTS = {
     "sleep_interval_subtitles": 2,  # Sleep before subtitle downloads
     # Continue on download errors
     "ignoreerrors": False,
-    # Quiet mode
-    "quiet": True,
-    "no_warnings": True,
+    # Logging settings - Enable output to see ffmpeg progress
+    "quiet": False,
+    "no_warnings": False,
+    "verbose": True,
 }
 
 

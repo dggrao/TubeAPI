@@ -2,11 +2,12 @@ import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse
 
 from app.auth import verify_credentials
 from app.models.schemas import MediaRequest
 from app.services.downloader import download_media, sanitize_filename
+from app.services.storage import upload_file
 
 router = APIRouter()
 
@@ -25,21 +26,6 @@ def cleanup_file(file_path: Path):
         pass  # Ignore cleanup errors
 
 
-# Media type mapping for content-type headers
-MEDIA_TYPE_MAP = {
-    ".mp4": "video/mp4",
-    ".webm": "video/webm",
-    ".mkv": "video/x-matroska",
-    ".avi": "video/x-msvideo",
-    ".mov": "video/quicktime",
-    ".mp3": "audio/mpeg",
-    ".m4a": "audio/mp4",
-    ".wav": "audio/wav",
-    ".flac": "audio/flac",
-    ".ogg": "audio/ogg",
-}
-
-
 @router.post("/download")
 async def download(
     request: MediaRequest,
@@ -47,15 +33,13 @@ async def download(
     username: str = Depends(verify_credentials),
 ):
     """
-    Download media from any yt-dlp supported site.
+    Download media from any yt-dlp supported site and upload to Supabase.
     
     Request body:
     - url: Media URL (supports 1000+ sites via yt-dlp)
     
-    Supports YouTube, Twitter/X, TikTok, Vimeo, Instagram, Reddit,
-    and many more. See https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
-    
-    Returns the media file as a binary stream.
+    Returns:
+    - JSON object containing the public URL of the uploaded file.
     """
     try:
         file_path, title, media_type = download_media(request.url)
@@ -64,19 +48,26 @@ async def download(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
-    # Schedule cleanup after response is sent
+    try:
+        # Determine filename
+        extension = file_path.suffix.lower()
+        safe_filename = sanitize_filename(title) + extension
+        
+        # Upload to Supabase
+        public_url = upload_file(file_path, safe_filename)
+        
+    except Exception as e:
+        # Clean up local file if upload fails
+        cleanup_file(file_path)
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+    # Schedule cleanup for local file
     background_tasks.add_task(cleanup_file, file_path)
 
-    # Determine content type and filename
-    extension = file_path.suffix.lower()
-    content_type = MEDIA_TYPE_MAP.get(extension, "application/octet-stream")
-    safe_filename = sanitize_filename(title) + extension
-
-    return FileResponse(
-        path=file_path,
-        filename=safe_filename,
-        media_type=content_type,
-        headers={
-            "Content-Disposition": f'attachment; filename="{safe_filename}"'
-        },
-    )
+    return {
+        "status": "success",
+        "url": public_url,
+        "title": title,
+        "media_type": media_type,
+        "filename": safe_filename
+    }

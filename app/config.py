@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     tubeapi_temp_dir: Path = Path("/tmp/tubeapi")
     tubeapi_cleanup_max_age: int = 7200  # 2 hours in seconds
 
+    # Supabase
+    supabase_url: str
+    supabase_key: str
+    supabase_bucket: str = "yt-stock"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
