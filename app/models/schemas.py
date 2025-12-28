@@ -74,10 +74,16 @@ class InfoRequest(BaseModel):
 
 
 class TranscriptRequest(BaseModel):
-    """Request body for transcript."""
+    """Request body for transcript.
+    
+    If language is not specified, uses smart fallback:
+    1. Original language subtitles
+    2. English subtitles
+    3. Auto-generated English
+    """
 
     url: str
-    language: Optional[str] = "en"
+    language: Optional[str] = None  # None = smart fallback (original -> English -> auto)
 
 
 class MediaRequest(BaseModel):

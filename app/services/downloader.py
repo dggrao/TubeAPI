@@ -9,7 +9,7 @@ from app.config import settings
 
 
 # Base yt-dlp options for network reliability on Raspberry Pi / home networks
-# These settings help handle temporary network drops and IPv6 issues
+# These settings help handle temporary network drops, IPv6 issues, and rate limiting
 BASE_YDL_OPTS = {
     # Force IPv4 to avoid IPv6 connectivity issues
     "force_ipv4": True,
@@ -20,6 +20,11 @@ BASE_YDL_OPTS = {
     "extractor_retries": 5,
     # Socket timeout (seconds)
     "socket_timeout": 30,
+    # Rate limiting to avoid 429 Too Many Requests errors
+    "sleep_interval": 1,  # Sleep 1 second between requests
+    "max_sleep_interval": 5,  # Maximum sleep interval
+    "sleep_interval_requests": 1,  # Sleep between HTTP requests
+    "sleep_interval_subtitles": 2,  # Sleep before subtitle downloads
     # Continue on download errors
     "ignoreerrors": False,
     # Quiet mode

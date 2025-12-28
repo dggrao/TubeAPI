@@ -101,7 +101,7 @@ Downloads and returns the video as MP4.
 
 **Example:**
 ```bash
-curl -u admin:password \
+curl -u admin:pass \
   -X POST \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "quality": "720"}' \
@@ -126,7 +126,7 @@ Extracts and returns audio as MP3.
 
 **Example:**
 ```bash
-curl -u admin:password \
+curl -u admin:pass \
   -X POST \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}' \
@@ -147,6 +147,15 @@ Returns video metadata as JSON.
 {
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 }
+```
+
+**Example:**
+```bash
+curl -u admin:pass \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}' \
+  "http://localhost:8000/youtube/info"
 ```
 
 **Response:**
@@ -179,14 +188,42 @@ Returns subtitles/captions as JSON.
 ```json
 {
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  "language": "en"
+  "language": "es"
 }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `url` | string | Yes | YouTube video URL |
-| `language` | string | No | Language code. Default: "en" |
+| `language` | string | No | Language code. If omitted, uses smart fallback (see below) |
+
+**Smart Subtitle Fallback (when language is not specified):**
+1. Original language subtitles (uploaded by creator)
+2. English subtitles
+3. Auto-generated English
+
+**When language IS specified:**
+1. Original subtitles for that language
+2. Auto-generated subtitles for that language
+3. Falls back to default priority
+
+**Example (smart fallback - no language):**
+```bash
+curl -u admin:pass \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}' \
+  "http://localhost:8000/youtube/transcript"
+```
+
+**Example (specific language):**
+```bash
+curl -u admin:pass \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "language": "es"}' \
+  "http://localhost:8000/youtube/transcript"
+```
 
 **Response:**
 ```json
@@ -227,7 +264,7 @@ Downloads media from any yt-dlp supported site.
 **Example:**
 ```bash
 # Twitter/X video
-curl -u admin:password \
+curl -u admin:pass \
   -X POST \
   -H "Content-Type: application/json" \
   -d '{"url": "https://twitter.com/user/status/123456789"}' \
@@ -235,7 +272,7 @@ curl -u admin:password \
   -o video.mp4
 
 # TikTok video
-curl -u admin:password \
+curl -u admin:pass \
   -X POST \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@user/video/123456789"}' \

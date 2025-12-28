@@ -138,12 +138,22 @@ async def get_video_transcript(
     
     Request body:
     - url: YouTube video URL
-    - language: Subtitle language code (default: "en")
+    - language: Subtitle language code (optional)
+    
+    Subtitle priority when language is NOT specified:
+    1. Original language subtitles
+    2. English subtitles
+    3. Auto-generated English
+    
+    When language IS specified:
+    1. Original subtitles for that language
+    2. Auto-generated for that language
+    3. Falls back to default priority
     
     Returns the transcript as a list of timed segments.
     """
     try:
-        transcript = get_transcript(request.url, request.language or "en")
+        transcript = get_transcript(request.url, request.language)
         return TranscriptResponse(**transcript)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
