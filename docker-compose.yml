@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  tubeapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tubeapi
+    restart: unless-stopped
+    ports:
+      - "${TUBEAPI_PORT:-8000}:8000"
+    environment:
+      - TUBEAPI_USER=${TUBEAPI_USER:-admin}
+      - TUBEAPI_PASS=${TUBEAPI_PASS:-changeme}
+      - TUBEAPI_PORT=${TUBEAPI_PORT:-8000}
+      - TUBEAPI_TEMP_DIR=${TUBEAPI_TEMP_DIR:-/tmp/tubeapi}
+      - TUBEAPI_CLEANUP_MAX_AGE=${TUBEAPI_CLEANUP_MAX_AGE:-7200}
+    volumes:
+      # Optional: Persist temp files across restarts (not recommended for limited storage)
+      # - tubeapi_temp:/tmp/tubeapi
+      # Mount for Coolify health checks
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Optional volume for temp file persistence
+# volumes:
+#   tubeapi_temp:
+
