@@ -33,6 +33,14 @@ def cleanup_file(file_path: Path):
         pass  # Ignore cleanup errors
 
 
+import random
+import string
+
+# ... (keep existing imports)
+from app.services.storage import upload_file
+
+# ... (keep existing imports)
+
 @router.post("/video")
 async def get_video(
     request: VideoRequest,
@@ -40,13 +48,14 @@ async def get_video(
     username: str = Depends(verify_credentials),
 ):
     """
-    Download a YouTube video as MP4.
+    Download a YouTube video as MP4 and upload to Supabase.
     
     Request body:
     - url: YouTube video URL
     - quality: Video quality (e.g., "1080", "720", "480", "best"). Default: "1080"
     
-    Returns the video file as a binary stream.
+    Returns:
+    - JSON object containing the public URL of the uploaded file.
     """
     try:
         file_path, title = download_video(request.url, quality=request.quality or "1080")
@@ -55,19 +64,31 @@ async def get_video(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
-    # Schedule cleanup after response is sent
+    try:
+        # Generate random 16-char alphanumeric string for filename
+        # 16digit randomly generated uuid string without special charters
+        random_string = ''.join(random.choices(string.ascii_lowercase + string.digits, k=16))
+        extension = file_path.suffix.lower()
+        safe_filename = f"{random_string}{extension}"
+        
+        # Upload to Supabase
+        public_url = upload_file(file_path, safe_filename)
+        
+    except Exception as e:
+        # Clean up local file if upload fails
+        cleanup_file(file_path)
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+    # Schedule cleanup for local file
     background_tasks.add_task(cleanup_file, file_path)
 
-    safe_filename = sanitize_filename(title) + ".mp4"
-
-    return FileResponse(
-        path=file_path,
-        filename=safe_filename,
-        media_type="video/mp4",
-        headers={
-            "Content-Disposition": f'attachment; filename="{safe_filename}"'
-        },
-    )
+    return {
+        "status": "success",
+        "url": public_url,
+        "title": title,
+        "media_type": "video/mp4",
+        "filename": safe_filename
+    }
 
 
 @router.post("/audio")

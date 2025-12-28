@@ -17,18 +17,21 @@ A self-hosted media download API service powered by [yt-dlp](https://github.com/
 ### Using Docker Compose (Recommended)
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/yourusername/tubeapi.git
    cd tubeapi
    ```
 
 2. Create your environment file:
+
    ```bash
    cp .env.example .env
    # Edit .env with your credentials
    ```
 
 3. Start the service:
+
    ```bash
    docker-compose up -d
    ```
@@ -56,6 +59,9 @@ docker run -d \
 | `TUBEAPI_PORT` | API port | `8000` |
 | `TUBEAPI_TEMP_DIR` | Temp download directory | `/tmp/tubeapi` |
 | `TUBEAPI_CLEANUP_MAX_AGE` | Max file age in seconds | `7200` (2 hours) |
+| `SUPABASE_URL` | Supabase Project URL | - |
+| `SUPABASE_KEY` | Supabase Anon/Service Key | - |
+| `SUPABASE_BUCKET` | Storage Bucket Name | `yt-stock` |
 
 ## API Endpoints
 
@@ -70,6 +76,7 @@ GET /health
 Returns API status and yt-dlp version. No authentication required.
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -84,9 +91,10 @@ Returns API status and yt-dlp version. No authentication required.
 POST /youtube/video
 ```
 
-Downloads and returns the video as MP4.
+Downloads video as MP4 and uploads to Supabase. Returns a public URL.
 
 **Request Body:**
+
 ```json
 {
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -100,13 +108,22 @@ Downloads and returns the video as MP4.
 | `quality` | string | No | Video quality: "1080", "720", "480", "360", "best", "worst". Default: "1080" |
 
 **Example:**
+
 ```bash
 curl -u admin:pass \
   -X POST \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "quality": "720"}' \
-  "http://localhost:8000/youtube/video" \
-  -o video.mp4
+  "http://localhost:8000/youtube/video"
+
+# Returns JSON with public URL:
+# {
+#   "status": "success",
+#   "url": "https://your-project.supabase.co/storage/v1/object/public/yt-stock/abc123def456ghi7.mp4",
+#   "title": "Video Title",
+#   "media_type": "video/mp4",
+#   "filename": "abc123def456ghi7.mp4"
+# }
 ```
 
 ### Download Audio (YouTube)
@@ -118,6 +135,7 @@ POST /youtube/audio
 Extracts and returns audio as MP3.
 
 **Request Body:**
+
 ```json
 {
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
@@ -125,6 +143,7 @@ Extracts and returns audio as MP3.
 ```
 
 **Example:**
+
 ```bash
 curl -u admin:pass \
   -X POST \
@@ -143,6 +162,7 @@ POST /youtube/info
 Returns video metadata as JSON.
 
 **Request Body:**
+
 ```json
 {
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
@@ -150,6 +170,7 @@ Returns video metadata as JSON.
 ```
 
 **Example:**
+
 ```bash
 curl -u admin:pass \
   -X POST \
@@ -159,6 +180,7 @@ curl -u admin:pass \
 ```
 
 **Response:**
+
 ```json
 {
   "id": "dQw4w9WgXcQ",
@@ -185,6 +207,7 @@ POST /youtube/transcript
 Returns subtitles/captions as JSON.
 
 **Request Body:**
+
 ```json
 {
   "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -198,16 +221,19 @@ Returns subtitles/captions as JSON.
 | `language` | string | No | Language code. If omitted, uses smart fallback (see below) |
 
 **Smart Subtitle Fallback (when language is not specified):**
+
 1. Original language subtitles (uploaded by creator)
 2. English subtitles
 3. Auto-generated English
 
 **When language IS specified:**
+
 1. Original subtitles for that language
 2. Auto-generated subtitles for that language
 3. Falls back to default priority
 
 **Example (smart fallback - no language):**
+
 ```bash
 curl -u admin:pass \
   -X POST \
@@ -217,6 +243,7 @@ curl -u admin:pass \
 ```
 
 **Example (specific language):**
+
 ```bash
 curl -u admin:pass \
   -X POST \
@@ -226,6 +253,7 @@ curl -u admin:pass \
 ```
 
 **Response:**
+
 ```json
 {
   "video_id": "dQw4w9WgXcQ",
@@ -252,9 +280,10 @@ curl -u admin:pass \
 POST /media/download
 ```
 
-Downloads media from any yt-dlp supported site.
+Downloads media from any yt-dlp supported site and uploads it to Supabase. Returns a public URL.
 
 **Request Body:**
+
 ```json
 {
   "url": "https://twitter.com/user/status/123456789"
@@ -262,22 +291,23 @@ Downloads media from any yt-dlp supported site.
 ```
 
 **Example:**
+
 ```bash
 # Twitter/X video
 curl -u admin:pass \
   -X POST \
   -H "Content-Type: application/json" \
   -d '{"url": "https://twitter.com/user/status/123456789"}' \
-  "http://localhost:8000/media/download" \
-  -o video.mp4
+  "http://localhost:8000/media/download"
 
-# TikTok video
-curl -u admin:pass \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@user/video/123456789"}' \
-  "http://localhost:8000/media/download" \
-  -o video.mp4
+# Returns JSON with public URL:
+# {
+#   "status": "success",
+#   "url": "https://your-project.supabase.co/storage/v1/object/public/yt-stock/Video_Title.mp4",
+#   "title": "Video Title",
+#   "media_type": "video/mp4",
+#   "filename": "Video_Title.mp4"
+# }
 ```
 
 ## Coolify Deployment
@@ -322,6 +352,7 @@ uvicorn app.main:app --reload
 ### API Documentation
 
 When running, visit:
+
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
