@@ -1,10 +1,11 @@
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from app.auth import verify_credentials
+from app.models.schemas import MediaRequest
 from app.services.downloader import download_media, sanitize_filename
 
 router = APIRouter()
@@ -39,14 +40,17 @@ MEDIA_TYPE_MAP = {
 }
 
 
-@router.get("/download")
+@router.post("/download")
 async def download(
+    request: MediaRequest,
     background_tasks: BackgroundTasks,
-    url: str = Query(..., description="Media URL (supports 1000+ sites via yt-dlp)"),
     username: str = Depends(verify_credentials),
 ):
     """
     Download media from any yt-dlp supported site.
+    
+    Request body:
+    - url: Media URL (supports 1000+ sites via yt-dlp)
     
     Supports YouTube, Twitter/X, TikTok, Vimeo, Instagram, Reddit,
     and many more. See https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md
@@ -54,7 +58,7 @@ async def download(
     Returns the media file as a binary stream.
     """
     try:
-        file_path, title, media_type = download_media(url)
+        file_path, title, media_type = download_media(request.url)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -76,4 +80,3 @@ async def download(
             "Content-Disposition": f'attachment; filename="{safe_filename}"'
         },
     )
-

@@ -52,3 +52,35 @@ class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
 
+
+# Request body schemas
+class VideoRequest(BaseModel):
+    """Request body for video download."""
+
+    url: str
+    quality: Optional[str] = "1080"  # Default to 1080p or less
+
+
+class AudioRequest(BaseModel):
+    """Request body for audio download."""
+
+    url: str
+
+
+class InfoRequest(BaseModel):
+    """Request body for video info."""
+
+    url: str
+
+
+class TranscriptRequest(BaseModel):
+    """Request body for transcript."""
+
+    url: str
+    language: Optional[str] = "en"
+
+
+class MediaRequest(BaseModel):
+    """Request body for generic media download."""
+
+    url: str

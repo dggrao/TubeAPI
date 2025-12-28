@@ -4,7 +4,7 @@ A self-hosted media download API service powered by [yt-dlp](https://github.com/
 
 ## Features
 
-- **Video Download** - Download videos as MP4
+- **Video Download** - Download videos as MP4 with selectable quality
 - **Audio Download** - Extract audio as MP3
 - **Video Info** - Get metadata (title, duration, views, etc.)
 - **Transcript** - Extract subtitles/captions as JSON
@@ -59,7 +59,7 @@ docker run -d \
 
 ## API Endpoints
 
-All endpoints except `/health` require HTTP Basic Authentication.
+All endpoints except `/health` require HTTP Basic Authentication. All download/info endpoints use POST with JSON body.
 
 ### Health Check
 
@@ -81,40 +81,73 @@ Returns API status and yt-dlp version. No authentication required.
 ### Download Video (YouTube)
 
 ```
-GET /youtube/video?url=<youtube_url>
+POST /youtube/video
 ```
 
 Downloads and returns the video as MP4.
 
+**Request Body:**
+```json
+{
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "quality": "1080"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `url` | string | Yes | YouTube video URL |
+| `quality` | string | No | Video quality: "1080", "720", "480", "360", "best", "worst". Default: "1080" |
+
 **Example:**
 ```bash
 curl -u admin:password \
-  "http://localhost:8000/youtube/video?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ" \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "quality": "720"}' \
+  "http://localhost:8000/youtube/video" \
   -o video.mp4
 ```
 
 ### Download Audio (YouTube)
 
 ```
-GET /youtube/audio?url=<youtube_url>
+POST /youtube/audio
 ```
 
 Extracts and returns audio as MP3.
 
+**Request Body:**
+```json
+{
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+}
+```
+
 **Example:**
 ```bash
 curl -u admin:password \
-  "http://localhost:8000/youtube/audio?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ" \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}' \
+  "http://localhost:8000/youtube/audio" \
   -o audio.mp3
 ```
 
 ### Get Video Info (YouTube)
 
 ```
-GET /youtube/info?url=<youtube_url>
+POST /youtube/info
 ```
 
 Returns video metadata as JSON.
+
+**Request Body:**
+```json
+{
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+}
+```
 
 **Response:**
 ```json
@@ -137,14 +170,23 @@ Returns video metadata as JSON.
 ### Get Transcript (YouTube)
 
 ```
-GET /youtube/transcript?url=<youtube_url>&language=en
+POST /youtube/transcript
 ```
 
 Returns subtitles/captions as JSON.
 
-**Parameters:**
-- `url` (required): YouTube video URL
-- `language` (optional): Language code (default: `en`)
+**Request Body:**
+```json
+{
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "language": "en"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `url` | string | Yes | YouTube video URL |
+| `language` | string | No | Language code. Default: "en" |
 
 **Response:**
 ```json
@@ -170,21 +212,34 @@ Returns subtitles/captions as JSON.
 ### Download Media (Any Site)
 
 ```
-GET /media/download?url=<media_url>
+POST /media/download
 ```
 
 Downloads media from any yt-dlp supported site.
+
+**Request Body:**
+```json
+{
+  "url": "https://twitter.com/user/status/123456789"
+}
+```
 
 **Example:**
 ```bash
 # Twitter/X video
 curl -u admin:password \
-  "http://localhost:8000/media/download?url=https://twitter.com/user/status/123456789" \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://twitter.com/user/status/123456789"}' \
+  "http://localhost:8000/media/download" \
   -o video.mp4
 
 # TikTok video
 curl -u admin:password \
-  "http://localhost:8000/media/download?url=https://www.tiktok.com/@user/video/123456789" \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.tiktok.com/@user/video/123456789"}' \
+  "http://localhost:8000/media/download" \
   -o video.mp4
 ```
 
@@ -236,4 +291,3 @@ When running, visit:
 ## License
 
 MIT License - feel free to use and modify for your personal projects.
-

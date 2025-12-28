@@ -1,4 +1,3 @@
-import os
 import re
 import uuid
 from pathlib import Path
@@ -9,15 +8,58 @@ import yt_dlp
 from app.config import settings
 
 
-def sanitize_filename(filename: str) -> str:
-    """Sanitize filename to remove invalid characters."""
+def sanitize_filename(filename: str, max_length: int = 100) -> str:
+    """
+    Sanitize filename to remove invalid characters and limit length.
+    
+    Args:
+        filename: Original filename
+        max_length: Maximum length for the filename (default: 100)
+        
+    Returns:
+        Sanitized filename safe for all filesystems
+    """
     # Remove or replace invalid characters
-    filename = re.sub(r'[<>:"/\\|?*]', '', filename)
-    # Replace multiple spaces with single space
-    filename = re.sub(r'\s+', ' ', filename)
-    # Trim and limit length
-    filename = filename.strip()[:200]
+    filename = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', filename)
+    # Replace special Unicode characters that might cause issues
+    filename = filename.encode('ascii', 'ignore').decode('ascii')
+    # Replace multiple spaces/underscores with single
+    filename = re.sub(r'[\s_]+', '_', filename)
+    # Remove leading/trailing dots and spaces
+    filename = filename.strip('. ')
+    # Limit length (leave room for extension)
+    filename = filename[:max_length]
+    # Final cleanup
+    filename = filename.strip('._')
     return filename if filename else "download"
+
+
+def get_quality_format(quality: str) -> str:
+    """
+    Convert quality string to yt-dlp format selector.
+    
+    Args:
+        quality: Quality string like "1080", "720", "480", "360", "best", "worst"
+        
+    Returns:
+        yt-dlp format selector string
+    """
+    quality = quality.lower().strip()
+    
+    # Remove 'p' suffix if present (e.g., "1080p" -> "1080")
+    quality = quality.rstrip('p')
+    
+    if quality == "best":
+        return "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
+    elif quality == "worst":
+        return "worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst"
+    elif quality.isdigit():
+        height = int(quality)
+        # Select best video up to specified height, with audio
+        return f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}][ext=mp4]/best[height<={height}]/best"
+    else:
+        # Default to 1080p or less
+        return "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]/best"
 
 
 def get_video_info(url: str) -> dict:
@@ -67,12 +109,17 @@ def get_video_info(url: str) -> dict:
     }
 
 
-def download_video(url: str, output_dir: Optional[Path] = None) -> tuple[Path, str]:
+def download_video(
+    url: str,
+    quality: str = "1080",
+    output_dir: Optional[Path] = None
+) -> tuple[Path, str]:
     """
     Download video as MP4.
     
     Args:
         url: Video URL
+        quality: Video quality (e.g., "1080", "720", "480", "best")
         output_dir: Directory to save the file (defaults to temp dir)
         
     Returns:
@@ -86,11 +133,14 @@ def download_video(url: str, output_dir: Optional[Path] = None) -> tuple[Path, s
     download_dir = output_dir / download_id
     download_dir.mkdir(parents=True, exist_ok=True)
 
-    output_template = str(download_dir / "%(title)s.%(ext)s")
+    # Use UUID-based filename to avoid filesystem issues
+    output_file = download_dir / f"{download_id}.%(ext)s"
+
+    format_selector = get_quality_format(quality)
 
     ydl_opts = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "outtmpl": output_template,
+        "format": format_selector,
+        "outtmpl": str(output_file),
         "merge_output_format": "mp4",
         "quiet": True,
         "no_warnings": True,
@@ -142,11 +192,12 @@ def download_audio(url: str, output_dir: Optional[Path] = None) -> tuple[Path, s
     download_dir = output_dir / download_id
     download_dir.mkdir(parents=True, exist_ok=True)
 
-    output_template = str(download_dir / "%(title)s.%(ext)s")
+    # Use UUID-based filename to avoid filesystem issues
+    output_file = download_dir / f"{download_id}.%(ext)s"
 
     ydl_opts = {
         "format": "bestaudio/best",
-        "outtmpl": output_template,
+        "outtmpl": str(output_file),
         "quiet": True,
         "no_warnings": True,
         "postprocessors": [
@@ -198,11 +249,12 @@ def download_media(url: str, output_dir: Optional[Path] = None) -> tuple[Path, s
     download_dir = output_dir / download_id
     download_dir.mkdir(parents=True, exist_ok=True)
 
-    output_template = str(download_dir / "%(title)s.%(ext)s")
+    # Use UUID-based filename to avoid filesystem issues
+    output_file = download_dir / f"{download_id}.%(ext)s"
 
     ydl_opts = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "outtmpl": output_template,
+        "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
+        "outtmpl": str(output_file),
         "merge_output_format": "mp4",
         "quiet": True,
         "no_warnings": True,
@@ -230,4 +282,3 @@ def download_media(url: str, output_dir: Optional[Path] = None) -> tuple[Path, s
             return file, title, media_type
 
     raise FileNotFoundError("Downloaded file not found")
-

@@ -1,11 +1,18 @@
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from app.auth import verify_credentials
-from app.models.schemas import VideoInfo, TranscriptResponse
+from app.models.schemas import (
+    VideoInfo,
+    TranscriptResponse,
+    VideoRequest,
+    AudioRequest,
+    InfoRequest,
+    TranscriptRequest,
+)
 from app.services.downloader import get_video_info, download_video, download_audio, sanitize_filename
 from app.services.transcript import get_transcript
 
@@ -26,19 +33,23 @@ def cleanup_file(file_path: Path):
         pass  # Ignore cleanup errors
 
 
-@router.get("/video")
+@router.post("/video")
 async def get_video(
+    request: VideoRequest,
     background_tasks: BackgroundTasks,
-    url: str = Query(..., description="YouTube video URL"),
     username: str = Depends(verify_credentials),
 ):
     """
     Download a YouTube video as MP4.
     
+    Request body:
+    - url: YouTube video URL
+    - quality: Video quality (e.g., "1080", "720", "480", "best"). Default: "1080"
+    
     Returns the video file as a binary stream.
     """
     try:
-        file_path, title = download_video(url)
+        file_path, title = download_video(request.url, quality=request.quality or "1080")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -59,19 +70,22 @@ async def get_video(
     )
 
 
-@router.get("/audio")
+@router.post("/audio")
 async def get_audio(
+    request: AudioRequest,
     background_tasks: BackgroundTasks,
-    url: str = Query(..., description="YouTube video URL"),
     username: str = Depends(verify_credentials),
 ):
     """
     Download audio from a YouTube video as MP3.
     
+    Request body:
+    - url: YouTube video URL
+    
     Returns the audio file as a binary stream.
     """
     try:
-        file_path, title = download_audio(url)
+        file_path, title = download_audio(request.url)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -92,18 +106,21 @@ async def get_audio(
     )
 
 
-@router.get("/info", response_model=VideoInfo)
+@router.post("/info", response_model=VideoInfo)
 async def get_info(
-    url: str = Query(..., description="YouTube video URL"),
+    request: InfoRequest,
     username: str = Depends(verify_credentials),
 ):
     """
     Get metadata for a YouTube video.
     
+    Request body:
+    - url: YouTube video URL
+    
     Returns video information including title, duration, view count, etc.
     """
     try:
-        info = get_video_info(url)
+        info = get_video_info(request.url)
         return VideoInfo(**info)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -111,22 +128,24 @@ async def get_info(
         raise HTTPException(status_code=500, detail=f"Failed to get info: {str(e)}")
 
 
-@router.get("/transcript", response_model=TranscriptResponse)
+@router.post("/transcript", response_model=TranscriptResponse)
 async def get_video_transcript(
-    url: str = Query(..., description="YouTube video URL"),
-    language: str = Query("en", description="Subtitle language code"),
+    request: TranscriptRequest,
     username: str = Depends(verify_credentials),
 ):
     """
     Get transcript/subtitles for a YouTube video.
     
+    Request body:
+    - url: YouTube video URL
+    - language: Subtitle language code (default: "en")
+    
     Returns the transcript as a list of timed segments.
     """
     try:
-        transcript = get_transcript(url, language)
+        transcript = get_transcript(request.url, request.language or "en")
         return TranscriptResponse(**transcript)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get transcript: {str(e)}")
-
