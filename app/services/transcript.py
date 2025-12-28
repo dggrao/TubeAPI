@@ -145,10 +145,11 @@ def get_transcript(url: str, language: str | None = None) -> dict:
     Extract transcript/subtitles from a video.
     
     Uses SRT format by default as it has higher success rate and avoids 429 errors.
+    Uses yt-dlp nightly for latest YouTube compatibility.
     
     Subtitle priority:
-    - If no language specified: original language -> English -> auto-generated English
-    - If language specified: original of that lang -> auto-generated of that lang -> fallback to default
+    - If no language specified: original -> English -> auto-English -> ANY available
+    - If language specified: original of that lang -> auto of that lang -> fallback -> ANY available
     
     Args:
         url: Video URL
@@ -169,7 +170,7 @@ def get_transcript(url: str, language: str | None = None) -> dict:
         # User specified a language:
         # 1. Original subtitles for that language
         # 2. Auto-generated for that language  
-        # 3. Fallback to original -> English -> auto-English
+        # 3. Fallback to original -> English -> any available
         subtitle_langs = [
             f"{language}-orig",      # Original for specified language
             f"{language}.*",         # Any variant of specified language
@@ -178,14 +179,16 @@ def get_transcript(url: str, language: str | None = None) -> dict:
             "en-orig",               # English original
             "en.*",                  # Any English variant
             "en",                    # English
+            "all",                   # FINAL FALLBACK: Any available subtitle
         ]
     else:
-        # Default priority: original language -> English -> auto-generated
+        # Default priority: original language -> English -> any available
         subtitle_langs = [
             ".*-orig",               # Original language subtitles (any language)
             "en-orig",               # English original
             "en.*",                  # Any English variant (en, en-US, en-GB, etc.)
             "en",                    # Plain English
+            "all",                   # FINAL FALLBACK: Any available subtitle
         ]
 
     # Use SRT format - has higher success rate and fewer 429 errors
