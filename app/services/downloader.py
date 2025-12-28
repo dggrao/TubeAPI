@@ -8,6 +8,26 @@ import yt_dlp
 from app.config import settings
 
 
+# Base yt-dlp options for network reliability on Raspberry Pi / home networks
+# These settings help handle temporary network drops and IPv6 issues
+BASE_YDL_OPTS = {
+    # Force IPv4 to avoid IPv6 connectivity issues
+    "force_ipv4": True,
+    # Retry settings for network reliability
+    "retries": 10,
+    "fragment_retries": 10,
+    "file_access_retries": 5,
+    "extractor_retries": 5,
+    # Socket timeout (seconds)
+    "socket_timeout": 30,
+    # Continue on download errors
+    "ignoreerrors": False,
+    # Quiet mode
+    "quiet": True,
+    "no_warnings": True,
+}
+
+
 def sanitize_filename(filename: str, max_length: int = 100) -> str:
     """
     Sanitize filename to remove invalid characters and limit length.
@@ -73,8 +93,7 @@ def get_video_info(url: str) -> dict:
         Dictionary containing video metadata
     """
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
+        **BASE_YDL_OPTS,
         "extract_flat": False,
     }
 
@@ -139,11 +158,10 @@ def download_video(
     format_selector = get_quality_format(quality)
 
     ydl_opts = {
+        **BASE_YDL_OPTS,
         "format": format_selector,
         "outtmpl": str(output_file),
         "merge_output_format": "mp4",
-        "quiet": True,
-        "no_warnings": True,
         "postprocessors": [
             {
                 "key": "FFmpegVideoConvertor",
@@ -196,10 +214,9 @@ def download_audio(url: str, output_dir: Optional[Path] = None) -> tuple[Path, s
     output_file = download_dir / f"{download_id}.%(ext)s"
 
     ydl_opts = {
+        **BASE_YDL_OPTS,
         "format": "bestaudio/best",
         "outtmpl": str(output_file),
-        "quiet": True,
-        "no_warnings": True,
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -253,11 +270,10 @@ def download_media(url: str, output_dir: Optional[Path] = None) -> tuple[Path, s
     output_file = download_dir / f"{download_id}.%(ext)s"
 
     ydl_opts = {
+        **BASE_YDL_OPTS,
         "format": "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
         "outtmpl": str(output_file),
         "merge_output_format": "mp4",
-        "quiet": True,
-        "no_warnings": True,
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:

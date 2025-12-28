@@ -1,12 +1,12 @@
-import json
 import re
+import shutil
 import uuid
 from pathlib import Path
-from typing import Optional
 
 import yt_dlp
 
 from app.config import settings
+from app.services.downloader import BASE_YDL_OPTS
 
 
 def parse_vtt_content(content: str) -> list[dict]:
@@ -104,8 +104,7 @@ def get_transcript(url: str, language: str = "en") -> dict:
     output_template = str(download_dir / "%(id)s")
 
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
+        **BASE_YDL_OPTS,
         "skip_download": True,
         "writesubtitles": True,
         "writeautomaticsub": True,
@@ -138,7 +137,6 @@ def get_transcript(url: str, language: str = "en") -> dict:
 
     if not subtitle_file:
         # Clean up directory
-        import shutil
         shutil.rmtree(download_dir, ignore_errors=True)
         raise ValueError(f"No subtitles available for language: {language}")
 
@@ -147,7 +145,6 @@ def get_transcript(url: str, language: str = "en") -> dict:
     segments = parse_vtt_content(content)
 
     # Clean up directory
-    import shutil
     shutil.rmtree(download_dir, ignore_errors=True)
 
     return {
@@ -156,4 +153,3 @@ def get_transcript(url: str, language: str = "en") -> dict:
         "language": actual_language,
         "segments": segments,
     }
-
