@@ -88,50 +88,6 @@ def get_quality_format(quality: str) -> str:
         return "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]/best"
 
 
-def get_video_info(url: str) -> dict:
-    """
-    Extract video information without downloading.
-    
-    Args:
-        url: Video URL
-        
-    Returns:
-        Dictionary containing video metadata
-    """
-    ydl_opts = {
-        **BASE_YDL_OPTS,
-        "extract_flat": False,
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-
-    if not info:
-        raise ValueError("Could not extract video information")
-
-    # Extract available format descriptions
-    formats_available = []
-    if info.get("formats"):
-        for fmt in info["formats"]:
-            if fmt.get("format_note"):
-                formats_available.append(fmt["format_note"])
-        formats_available = list(set(formats_available))
-
-    return {
-        "id": info.get("id", ""),
-        "title": info.get("title", "Unknown"),
-        "description": info.get("description"),
-        "duration": info.get("duration"),
-        "uploader": info.get("uploader"),
-        "uploader_id": info.get("uploader_id"),
-        "upload_date": info.get("upload_date"),
-        "view_count": info.get("view_count"),
-        "like_count": info.get("like_count"),
-        "thumbnail": info.get("thumbnail"),
-        "webpage_url": info.get("webpage_url", url),
-        "extractor": info.get("extractor", "unknown"),
-        "formats_available": formats_available,
-    }
 
 
 def download_video(
@@ -197,60 +153,6 @@ def download_video(
     raise FileNotFoundError("Downloaded file not found")
 
 
-def download_audio(url: str, output_dir: Optional[Path] = None) -> tuple[Path, str]:
-    """
-    Download audio as MP3.
-    
-    Args:
-        url: Video URL
-        output_dir: Directory to save the file (defaults to temp dir)
-        
-    Returns:
-        Tuple of (file_path, title)
-    """
-    if output_dir is None:
-        output_dir = settings.ensure_temp_dir()
-
-    # Create unique subdirectory for this download
-    download_id = str(uuid.uuid4())
-    download_dir = output_dir / download_id
-    download_dir.mkdir(parents=True, exist_ok=True)
-
-    # Use UUID-based filename to avoid filesystem issues
-    output_file = download_dir / f"{download_id}.%(ext)s"
-
-    ydl_opts = {
-        **BASE_YDL_OPTS,
-        "format": "bestaudio/best",
-        "outtmpl": str(output_file),
-        "postprocessors": [
-            {
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }
-        ],
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-
-    if not info:
-        raise ValueError("Could not download audio")
-
-    title = info.get("title", "audio")
-    
-    # Find the downloaded file
-    for file in download_dir.iterdir():
-        if file.is_file() and file.suffix == ".mp3":
-            return file, title
-
-    # If no mp3 found, look for any audio file
-    for file in download_dir.iterdir():
-        if file.is_file():
-            return file, title
-
-    raise FileNotFoundError("Downloaded file not found")
 
 
 def download_media(url: str, output_dir: Optional[Path] = None) -> tuple[Path, str, str]:

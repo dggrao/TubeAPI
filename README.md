@@ -5,8 +5,6 @@ A self-hosted media download API service powered by [yt-dlp](https://github.com/
 ## Features
 
 - **Video Download** - Download videos as MP4 with selectable quality
-- **Audio Download** - Extract audio as MP3
-- **Video Info** - Get metadata (title, duration, views, etc.)
 - **Transcript** - Extract subtitles/captions as JSON
 - **Multi-Site Support** - Works with YouTube, Twitter/X, TikTok, Vimeo, Instagram, Reddit, and [many more](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)
 - **Auto-Cleanup** - Automatic file cleanup to save storage
@@ -126,77 +124,7 @@ curl -u admin:pass \
 # }
 ```
 
-### Download Audio (YouTube)
 
-```
-POST /youtube/audio
-```
-
-Extracts and returns audio as MP3.
-
-**Request Body:**
-
-```json
-{
-  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-}
-```
-
-**Example:**
-
-```bash
-curl -u admin:pass \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}' \
-  "http://localhost:8000/youtube/audio" \
-  -o audio.mp3
-```
-
-### Get Video Info (YouTube)
-
-```
-POST /youtube/info
-```
-
-Returns video metadata as JSON.
-
-**Request Body:**
-
-```json
-{
-  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-}
-```
-
-**Example:**
-
-```bash
-curl -u admin:pass \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}' \
-  "http://localhost:8000/youtube/info"
-```
-
-**Response:**
-
-```json
-{
-  "id": "dQw4w9WgXcQ",
-  "title": "Rick Astley - Never Gonna Give You Up",
-  "description": "...",
-  "duration": 212,
-  "uploader": "Rick Astley",
-  "upload_date": "20091025",
-  "view_count": 1500000000,
-  "like_count": 15000000,
-  "thumbnail": "https://...",
-  "webpage_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  "extractor": "youtube",
-  "formats_available": ["1080p", "720p", "480p", "360p"]
-}
-```
 
 ### Get Transcript (YouTube)
 

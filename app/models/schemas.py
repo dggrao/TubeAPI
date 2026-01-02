@@ -61,16 +61,8 @@ class VideoRequest(BaseModel):
     quality: Optional[str] = "1080"  # Default to 1080p or less
 
 
-class AudioRequest(BaseModel):
-    """Request body for audio download."""
-
-    url: str
 
 
-class InfoRequest(BaseModel):
-    """Request body for video info."""
-
-    url: str
 
 
 class TranscriptRequest(BaseModel):

@@ -9,11 +9,9 @@ from app.models.schemas import (
     VideoInfo,
     TranscriptResponse,
     VideoRequest,
-    AudioRequest,
-    InfoRequest,
     TranscriptRequest,
 )
-from app.services.downloader import get_video_info, download_video, download_audio, sanitize_filename
+from app.services.downloader import download_video, sanitize_filename
 from app.services.transcript import get_transcript
 
 router = APIRouter()
@@ -89,64 +87,6 @@ async def get_video(
         "media_type": "video/mp4",
         "filename": safe_filename
     }
-
-
-@router.post("/audio")
-async def get_audio(
-    request: AudioRequest,
-    background_tasks: BackgroundTasks,
-    username: str = Depends(verify_credentials),
-):
-    """
-    Download audio from a YouTube video as MP3.
-    
-    Request body:
-    - url: YouTube video URL
-    
-    Returns the audio file as a binary stream.
-    """
-    try:
-        file_path, title = download_audio(request.url)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
-
-    # Schedule cleanup after response is sent
-    background_tasks.add_task(cleanup_file, file_path)
-
-    safe_filename = sanitize_filename(title) + ".mp3"
-
-    return FileResponse(
-        path=file_path,
-        filename=safe_filename,
-        media_type="audio/mpeg",
-        headers={
-            "Content-Disposition": f'attachment; filename="{safe_filename}"'
-        },
-    )
-
-
-@router.post("/info", response_model=VideoInfo)
-async def get_info(
-    request: InfoRequest,
-    username: str = Depends(verify_credentials),
-):
-    """
-    Get metadata for a YouTube video.
-    
-    Request body:
-    - url: YouTube video URL
-    
-    Returns video information including title, duration, view count, etc.
-    """
-    try:
-        info = get_video_info(request.url)
-        return VideoInfo(**info)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get info: {str(e)}")
 
 
 @router.post("/transcript", response_model=TranscriptResponse)
