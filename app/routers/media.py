@@ -42,7 +42,7 @@ async def download(
     - JSON object containing the public URL of the uploaded file.
     """
     try:
-        file_path, title, media_type = download_media(request.url)
+        file_path, title, media_type = download_media(request.url, proxy=request.proxy)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

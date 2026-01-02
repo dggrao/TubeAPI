@@ -53,7 +53,11 @@ async def get_video(
     - JSON object containing the public URL of the uploaded file.
     """
     try:
-        file_path, title = download_video(request.url, quality=request.quality or "1080")
+        file_path, title = download_video(
+            request.url, 
+            quality=request.quality or "1080",
+            proxy=request.proxy
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

@@ -44,6 +44,7 @@ class VideoRequest(BaseModel):
 
     url: str
     quality: Optional[str] = "1080"  # Default to 1080p or less
+    proxy: Optional[str] = None
 
 
 
@@ -56,3 +57,4 @@ class MediaRequest(BaseModel):
     """Request body for generic media download."""
 
     url: str
+    proxy: Optional[str] = None

@@ -93,7 +93,8 @@ def get_quality_format(quality: str) -> str:
 def download_video(
     url: str,
     quality: str = "1080",
-    output_dir: Optional[Path] = None
+    output_dir: Optional[Path] = None,
+    proxy: Optional[str] = None
 ) -> tuple[Path, str]:
     """
     Download video as MP4.
@@ -132,6 +133,9 @@ def download_video(
         ],
     }
 
+    if proxy:
+        ydl_opts["proxy"] = proxy
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
 
@@ -155,7 +159,11 @@ def download_video(
 
 
 
-def download_media(url: str, output_dir: Optional[Path] = None) -> tuple[Path, str, str]:
+def download_media(
+    url: str, 
+    output_dir: Optional[Path] = None,
+    proxy: Optional[str] = None
+) -> tuple[Path, str, str]:
     """
     Download media from any yt-dlp supported site.
     
@@ -183,6 +191,9 @@ def download_media(url: str, output_dir: Optional[Path] = None) -> tuple[Path, s
         "outtmpl": str(output_file),
         "merge_output_format": "mp4",
     }
+
+    if proxy:
+        ydl_opts["proxy"] = proxy
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
