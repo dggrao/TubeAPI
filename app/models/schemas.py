@@ -21,21 +21,6 @@ class VideoInfo(BaseModel):
     formats_available: Optional[list[str]] = None
 
 
-class TranscriptSegment(BaseModel):
-    """Single transcript segment."""
-
-    start: float  # Start time in seconds
-    duration: float  # Duration in seconds
-    text: str
-
-
-class TranscriptResponse(BaseModel):
-    """Transcript response schema."""
-
-    video_id: str
-    title: str
-    language: str
-    segments: list[TranscriptSegment]
 
 
 class HealthResponse(BaseModel):
@@ -65,17 +50,6 @@ class VideoRequest(BaseModel):
 
 
 
-class TranscriptRequest(BaseModel):
-    """Request body for transcript.
-    
-    If language is not specified, uses smart fallback:
-    1. Original language subtitles
-    2. English subtitles
-    3. Auto-generated English
-    """
-
-    url: str
-    language: Optional[str] = None  # None = smart fallback (original -> English -> auto)
 
 
 class MediaRequest(BaseModel):

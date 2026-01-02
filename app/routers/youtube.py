@@ -7,12 +7,9 @@ from fastapi.responses import FileResponse
 from app.auth import verify_credentials
 from app.models.schemas import (
     VideoInfo,
-    TranscriptResponse,
     VideoRequest,
-    TranscriptRequest,
 )
 from app.services.downloader import download_video, sanitize_filename
-from app.services.transcript import get_transcript
 
 router = APIRouter()
 
@@ -89,34 +86,4 @@ async def get_video(
     }
 
 
-@router.post("/transcript", response_model=TranscriptResponse)
-async def get_video_transcript(
-    request: TranscriptRequest,
-    username: str = Depends(verify_credentials),
-):
-    """
-    Get transcript/subtitles for a YouTube video.
-    
-    Request body:
-    - url: YouTube video URL
-    - language: Subtitle language code (optional)
-    
-    Subtitle priority when language is NOT specified:
-    1. Original language subtitles
-    2. English subtitles
-    3. Auto-generated English
-    
-    When language IS specified:
-    1. Original subtitles for that language
-    2. Auto-generated for that language
-    3. Falls back to default priority
-    
-    Returns the transcript as a list of timed segments.
-    """
-    try:
-        transcript = get_transcript(request.url, request.language)
-        return TranscriptResponse(**transcript)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get transcript: {str(e)}")
+

@@ -2,10 +2,14 @@
 
 A self-hosted media download API service powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp). Download videos, audio, and transcripts from YouTube and 1000+ other sites.
 
+
+> [!NOTE]
+> This is a personal deployment. It is designed to work for downloading YouTube videos and other media for personal use. If you need any additional features, please create an issue, and I will take a look into it.
+
 ## Features
 
 - **Video Download** - Download videos as MP4 with selectable quality
-- **Transcript** - Extract subtitles/captions as JSON
+
 - **Multi-Site Support** - Works with YouTube, Twitter/X, TikTok, Vimeo, Instagram, Reddit, and [many more](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)
 - **Auto-Cleanup** - Automatic file cleanup to save storage
 - **Always Updated** - yt-dlp auto-updates on container restart
@@ -126,81 +130,6 @@ curl -u admin:pass \
 
 
 
-### Get Transcript (YouTube)
-
-```
-POST /youtube/transcript
-```
-
-Returns subtitles/captions as JSON.
-
-**Request Body:**
-
-```json
-{
-  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  "language": "es"
-}
-```
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `url` | string | Yes | YouTube video URL |
-| `language` | string | No | Language code. If omitted, uses smart fallback (see below) |
-
-**Smart Subtitle Fallback (when language is not specified):**
-
-1. Original language subtitles (uploaded by creator)
-2. English subtitles
-3. Auto-generated English
-
-**When language IS specified:**
-
-1. Original subtitles for that language
-2. Auto-generated subtitles for that language
-3. Falls back to default priority
-
-**Example (smart fallback - no language):**
-
-```bash
-curl -u admin:pass \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}' \
-  "http://localhost:8000/youtube/transcript"
-```
-
-**Example (specific language):**
-
-```bash
-curl -u admin:pass \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "language": "es"}' \
-  "http://localhost:8000/youtube/transcript"
-```
-
-**Response:**
-
-```json
-{
-  "video_id": "dQw4w9WgXcQ",
-  "title": "Rick Astley - Never Gonna Give You Up",
-  "language": "en",
-  "segments": [
-    {
-      "start": 0.0,
-      "duration": 3.5,
-      "text": "We're no strangers to love"
-    },
-    {
-      "start": 3.5,
-      "duration": 2.8,
-      "text": "You know the rules and so do I"
-    }
-  ]
-}
-```
 
 ### Download Media (Any Site)
 
