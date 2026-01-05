@@ -1,5 +1,7 @@
+import logging
 import shutil
 from pathlib import Path
+import yt_dlp
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -10,6 +12,8 @@ from app.models.schemas import (
     VideoRequest,
 )
 from app.services.downloader import download_video, sanitize_filename
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -24,17 +28,15 @@ def cleanup_file(file_path: Path):
         parent = file_path.parent
         if parent.exists() and not any(parent.iterdir()):
             shutil.rmtree(parent, ignore_errors=True)
-    except Exception:
-        pass  # Ignore cleanup errors
+    except Exception as e:
+        logger.error(f"Error cleaning up file {file_path}: {e}") 
 
 
 import random
 import string
 
-# ... (keep existing imports)
 from app.services.storage import upload_file
 
-# ... (keep existing imports)
 
 @router.post("/video")
 async def get_video(
@@ -52,16 +54,39 @@ async def get_video(
     Returns:
     - JSON object containing the public URL of the uploaded file.
     """
+    logger.info(f"Received download request for URL: {request.url} (Quality: {request.quality})")
+    
     try:
         file_path, title = download_video(
             request.url, 
             quality=request.quality or "1080",
             proxy=request.proxy
         )
+    except yt_dlp.utils.DownloadError as e:
+        error_msg = str(e)
+        logger.error(f"yt-dlp download error: {error_msg}")
+        
+        # Check for common client-side errors
+        client_errors = [
+            "Video unavailable",
+            "Private video",
+            "Sign in to confirm your age",
+            "This video has been removed",
+            "Incomplete YouTube ID",
+            "KeyError"
+        ]
+        
+        if any(err in error_msg for err in client_errors):
+            raise HTTPException(status_code=400, detail=f"Video unavailable or invalid: {error_msg}")
+            
+        raise HTTPException(status_code=400, detail=f"Download failed: {error_msg}")
+        
     except ValueError as e:
+        logger.warning(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
+        logger.exception("Unexpected error during video download")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
     try:
         # Generate random 16-char alphanumeric string for filename

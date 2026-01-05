@@ -1,7 +1,9 @@
-import os
+import logging
 from pathlib import Path
 import httpx
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 def upload_file(file_path: Path, filename: str = None) -> str:
     """
@@ -25,7 +27,11 @@ def upload_file(file_path: Path, filename: str = None) -> str:
     # User said: "It's a public bucket... upload the file to it... response with a public link"
     # User example: https://supabase.dynoxglobal.com/storage/v1/object/yt-stock/folder/avatar1.png
     
-    # We will upload to the root of the bucket for simplicity unless needed otherwise.
+    # Check if Supabase credentials are set
+    if not settings.supabase_url or not settings.supabase_key:
+        logger.warning(f"Supabase credentials not set. Skipping upload for {filename}.")
+        return f"http://localhost:8000/skipped-upload/{filename}"
+
     bucket = settings.supabase_bucket
     key = filename
     
