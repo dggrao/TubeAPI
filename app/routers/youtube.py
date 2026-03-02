@@ -1,41 +1,33 @@
 import logging
+import random
 import shutil
+import string
 from pathlib import Path
-import yt_dlp
 
+import yt_dlp
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from fastapi.responses import FileResponse
 
 from app.auth import verify_credentials
-from app.models.schemas import (
-    VideoInfo,
-    VideoRequest,
-)
-from app.services.downloader import download_video, sanitize_filename
+from app.models.schemas import VideoRequest
+from app.services.cleanup import schedule_gcs_deletion
+from app.services.downloader import download_video
+from app.services.storage import upload_file
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-def cleanup_file(file_path: Path):
-    """Background task to clean up downloaded files."""
+def _cleanup_file(file_path: Path):
+    """Background task: delete local downloaded file and its parent dir if empty."""
     try:
-        # Delete the file
         if file_path.exists():
             file_path.unlink()
-        # Delete the parent directory if empty
         parent = file_path.parent
         if parent.exists() and not any(parent.iterdir()):
             shutil.rmtree(parent, ignore_errors=True)
-    except Exception as e:
-        logger.error(f"Error cleaning up file {file_path}: {e}") 
-
-
-import random
-import string
-
-from app.services.storage import upload_file
+    except Exception as exc:
+        logger.error("Error cleaning up local file %s: %s", file_path, exc)
 
 
 @router.post("/video")
@@ -45,74 +37,60 @@ async def get_video(
     username: str = Depends(verify_credentials),
 ):
     """
-    Download a YouTube video as MP4 and upload to Supabase.
-    
+    Download a YouTube video as MP4, upload to GCS, and return a signed URL.
+
+    The URL is valid for 1 hour, after which the file is also deleted from GCS.
+
     Request body:
-    - url: YouTube video URL
-    - quality: Video quality (e.g., "1080", "720", "480", "best"). Default: "1080"
-    
+    - url:     YouTube video URL
+    - quality: Video quality ("1080", "720", "480", "best"). Default: "1080"
+    - proxy:   Optional proxy URL
+
     Returns:
-    - JSON object containing the public URL of the uploaded file.
+    - JSON with a signed GCS URL valid for 1 hour.
     """
-    logger.info(f"Received download request for URL: {request.url} (Quality: {request.quality})")
-    
+    logger.info("Download request: url=%s quality=%s", request.url, request.quality)
+
+    # --- Download ---
     try:
         file_path, title = download_video(
-            request.url, 
+            request.url,
             quality=request.quality or "1080",
-            proxy=request.proxy
+            proxy=request.proxy,
         )
-    except yt_dlp.utils.DownloadError as e:
-        error_msg = str(e)
-        logger.error(f"yt-dlp download error: {error_msg}")
-        
-        # Check for common client-side errors
+    except yt_dlp.utils.DownloadError as exc:
+        error_msg = str(exc)
+        logger.error("yt-dlp error: %s", error_msg)
         client_errors = [
-            "Video unavailable",
-            "Private video",
-            "Sign in to confirm your age",
-            "This video has been removed",
-            "Incomplete YouTube ID",
-            "KeyError"
+            "Video unavailable", "Private video", "Sign in to confirm your age",
+            "This video has been removed", "Incomplete YouTube ID", "KeyError",
         ]
-        
-        if any(err in error_msg for err in client_errors):
-            raise HTTPException(status_code=400, detail=f"Video unavailable or invalid: {error_msg}")
-            
-        raise HTTPException(status_code=400, detail=f"Download failed: {error_msg}")
-        
-    except ValueError as e:
-        logger.warning(f"Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+        status = 400 if any(e in error_msg for e in client_errors) else 400
+        raise HTTPException(status_code=status, detail=f"Download failed: {error_msg}")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
         logger.exception("Unexpected error during video download")
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {exc}")
 
+    # --- Upload to GCS ---
     try:
-        # Generate random 16-char alphanumeric string for filename
-        # 16digit randomly generated uuid string without special charters
-        random_string = ''.join(random.choices(string.ascii_lowercase + string.digits, k=16))
-        extension = file_path.suffix.lower()
-        safe_filename = f"{random_string}{extension}"
-        
-        # Upload to Supabase
-        public_url = upload_file(file_path, safe_filename)
-        
-    except Exception as e:
-        # Clean up local file if upload fails
-        cleanup_file(file_path)
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        random_string = "".join(random.choices(string.ascii_lowercase + string.digits, k=16))
+        safe_filename = f"{random_string}{file_path.suffix.lower()}"
 
-    # Schedule cleanup for local file
-    background_tasks.add_task(cleanup_file, file_path)
+        signed_url, gcs_filename = upload_file(file_path, safe_filename)
+    except Exception as exc:
+        background_tasks.add_task(_cleanup_file, file_path)
+        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}")
+
+    # Clean up local file and schedule GCS deletion after 1 hour
+    background_tasks.add_task(_cleanup_file, file_path)
+    schedule_gcs_deletion(gcs_filename)
 
     return {
         "status": "success",
-        "url": public_url,
+        "url": signed_url,
         "title": title,
         "media_type": "video/mp4",
-        "filename": safe_filename
+        "filename": gcs_filename,
     }
-
-
-

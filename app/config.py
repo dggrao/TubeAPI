@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings
@@ -16,12 +15,11 @@ class Settings(BaseSettings):
 
     # File management
     tubeapi_temp_dir: Path = Path("/tmp/tubeapi")
-    tubeapi_cleanup_max_age: int = 7200  # 2 hours in seconds
+    tubeapi_cleanup_max_age: int = 3600  # 1 hour in seconds (orphan local file cleanup)
+    tubeapi_file_ttl: int = 3600         # 1 hour: signed URL expiry + GCS auto-deletion
 
-    # Supabase
-    supabase_url: str
-    supabase_key: str
-    supabase_bucket: str = "yt-stock"
+    # Google Cloud Storage
+    gcs_bucket_name: str = "tubeapi-videos"
 
     class Config:
         env_file = ".env"
@@ -35,4 +33,3 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
-

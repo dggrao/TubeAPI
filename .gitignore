@@ -37,6 +37,9 @@ env/
 .env
 .env.local
 
+# GCS service account key — never commit credentials
+credentials.json
+
 # Temp files
 /tmp/
 *.tmp

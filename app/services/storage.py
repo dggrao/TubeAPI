@@ -1,81 +1,106 @@
+import datetime
 import logging
+import mimetypes
 from pathlib import Path
-import httpx
+
+import google.auth
+import google.auth.transport.requests
+from google.cloud import storage
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-def upload_file(file_path: Path, filename: str = None) -> str:
+
+def _get_client() -> storage.Client:
+    """Get GCS client using Application Default Credentials or key file."""
+    return storage.Client()
+
+
+def _generate_signed_url(blob: storage.Blob) -> str:
     """
-    Upload a file to Supabase storage and return the public URL.
-    
+    Generate a V4 signed URL for a GCS blob.
+
+    Works with:
+    - Service account key file (GOOGLE_APPLICATION_CREDENTIALS)
+    - GCE Workload Identity / attached service account
+    """
+    expiration = datetime.timedelta(seconds=settings.tubeapi_file_ttl)
+    credentials, _ = google.auth.default()
+
+    auth_request = google.auth.transport.requests.Request()
+    if not credentials.valid:
+        credentials.refresh(auth_request)
+
+    # Service account key file: credentials carry a private key for signing
+    if hasattr(credentials, "sign_bytes"):
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=expiration,
+            method="GET",
+        )
+
+    # GCE / Workload Identity: delegate signing to the IAM API
+    service_account_email = getattr(credentials, "service_account_email", None)
+    if service_account_email:
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=expiration,
+            method="GET",
+            service_account_email=service_account_email,
+            access_token=credentials.token,
+        )
+
+    raise RuntimeError(
+        "Cannot generate signed URL: credentials don't support signing. "
+        "Set GOOGLE_APPLICATION_CREDENTIALS to a service account key file, "
+        "or run on a GCP VM with an attached service account that has "
+        "the 'Service Account Token Creator' role."
+    )
+
+
+def upload_file(file_path: Path, filename: str = None) -> tuple[str, str]:
+    """
+    Upload a file to GCS and return (signed_url, blob_name).
+
+    The signed URL expires after settings.tubeapi_file_ttl seconds (default 1h).
+    The caller is responsible for scheduling GCS deletion via schedule_gcs_deletion().
+
     Args:
-        file_path: Path to the local file
-        filename: Optional filename to use in storage. If not provided, uses file_path.name
-        
+        file_path: Path to the local file.
+        filename:  Blob name in GCS. Defaults to file_path.name.
+
     Returns:
-        Public URL of the uploaded file
+        Tuple of (signed_url, gcs_blob_name).
     """
     if not filename:
         filename = file_path.name
-        
-    # Construct the upload URL
-    # URL format: {supabase_url}/storage/v1/object/{bucket}/{filename}
-    # We'll use a 'public' folder inside the bucket to keep it organized if needed, 
-    # or just root. The prompt example showed 'yt-stock/folder/avatar1.png'.
-    # Let's put it in a 'videos' folder for better organization or just root?
-    # User said: "It's a public bucket... upload the file to it... response with a public link"
-    # User example: https://supabase.dynoxglobal.com/storage/v1/object/yt-stock/folder/avatar1.png
-    
-    # Check if Supabase credentials are set
-    if not settings.supabase_url or not settings.supabase_key:
-        logger.warning(f"Supabase credentials not set. Skipping upload for {filename}.")
-        return f"http://localhost:8000/skipped-upload/{filename}"
 
-    bucket = settings.supabase_bucket
-    key = filename
-    
-    upload_url = f"{settings.supabase_url}/storage/v1/object/{bucket}/{key}"
-    
-    headers = {
-        "Authorization": f"Bearer {settings.supabase_key}",
-        # content-type is set automatically by httpx when using files, but we can be explicit if needed.
-        # However, the user example showed raw data binary upload or multipart.
-        # curl -X POST ... --data-binary @...
-        # Let's use data-binary equivalent for simple upload if possible, or multipart.
-        # Supabase API usually accepts raw body for simple uploads.
-    }
-    
-    # MIME type detection
     content_type = "application/octet-stream"
-    import mimetypes
-    mime, _ = mimetypes.guess_type(file_path)
+    mime, _ = mimetypes.guess_type(str(file_path))
     if mime:
         content_type = mime
-        
-    headers["Content-Type"] = content_type
-    
-    with open(file_path, "rb") as f:
-        file_content = f.read()
-        
-    response = httpx.post(
-        upload_url,
-        headers=headers,
-        content=file_content,
-        timeout=300.0  # Large timeout for video files
-    )
-    
-    if response.status_code not in [200, 201]:
-        # If file already exists, it might return 400 or error.
-        # We should use upsert maybe? 
-        # User said: "objects table permissions: only insert when you are uploading new files and select, insert, and update when you are upserting files."
-        # If we just POST, it's an insert.
-        # If we want to overwrite, we might need x-upsert header.
-        # Let's just try insert first. UUID filenames make collisions unlikely.
-        raise Exception(f"Failed to upload to Supabase: {response.status_code} - {response.text}")
-        
-    # Construct Public URL
-    # https://supabase.dynoxglobal.com/storage/v1/object/public/yt-stock/folder/avatar1.png
-    public_url = f"{settings.supabase_url}/storage/v1/object/public/{bucket}/{key}"
-    
-    return public_url
+
+    client = _get_client()
+    bucket = client.bucket(settings.gcs_bucket_name)
+    blob = bucket.blob(filename)
+
+    blob.upload_from_filename(str(file_path), content_type=content_type)
+    logger.info("Uploaded %s to gs://%s/%s", filename, settings.gcs_bucket_name, filename)
+
+    signed_url = _generate_signed_url(blob)
+    logger.info("Signed URL generated for %s (TTL=%ds)", filename, settings.tubeapi_file_ttl)
+
+    return signed_url, filename
+
+
+def delete_gcs_object(filename: str) -> None:
+    """Delete an object from the GCS bucket."""
+    try:
+        client = _get_client()
+        bucket = client.bucket(settings.gcs_bucket_name)
+        blob = bucket.blob(filename)
+        blob.delete()
+        logger.info("Deleted gs://%s/%s", settings.gcs_bucket_name, filename)
+    except Exception as exc:
+        logger.warning("Failed to delete GCS object %s: %s", filename, exc)
